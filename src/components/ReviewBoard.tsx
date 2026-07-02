@@ -122,7 +122,7 @@ export function ReviewBoard() {
   const jumpLinks = useMemo(() => {
     if (!board) return [];
     const links: Array<{ id: string; label: string; count: number }> = [];
-    if (board.classify.length) links.push({ id: SECTION_IDS.classify, label: "Make or fill", count: board.classify.length });
+    if (board.classify.length) links.push({ id: SECTION_IDS.classify, label: "Classify", count: board.classify.length });
     if (board.make.length) links.push({ id: SECTION_IDS.make, label: "Make", count: board.make.length });
     if (board.fill.length) links.push({ id: SECTION_IDS.fill, label: "Fill", count: board.fill.length });
     if (partialDoneLines.length) links.push({ id: SECTION_IDS.partialDone, label: "Done (in progress)", count: partialDoneLines.length });
@@ -204,6 +204,27 @@ export function ReviewBoard() {
     }
   }
 
+  async function hideShippedBatch(requestNumber: string) {
+    const response = await fetch(`/api/requests/${requestNumber}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hide_from_view: true }),
+    });
+    if (response.ok) {
+      showToast(`${requestNumber} removed from shipped view.`);
+      await loadBoard({ silent: true });
+      return;
+    }
+    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    showToast(data?.error ?? "Could not remove from view.", "error");
+  }
+
+  function classifySuccessMessage(stage: FormulaStage): string {
+    if (stage === FORMULA_STAGE_MAKE) return "Moved to Make.";
+    if (stage === FORMULA_STAGE_FILL) return "Moved to Fill.";
+    return "Marked done.";
+  }
+
   return (
     <div className="min-w-0 space-y-8">
       {initialLoading ? (
@@ -226,11 +247,7 @@ export function ReviewBoard() {
             <ClassifySection
               lines={board.classify}
               onClassify={(lineId, stage) =>
-                void setLineStage(
-                  lineId,
-                  stage,
-                  stage === FORMULA_STAGE_MAKE ? "Moved to Make." : "Moved to Fill.",
-                )
+                void setLineStage(lineId, stage, classifySuccessMessage(stage))
               }
             />
           ) : null}
@@ -275,6 +292,7 @@ export function ReviewBoard() {
               batches={board.shipped}
               open={shippedOpen}
               onToggle={() => setShippedOpen((value) => !value)}
+              onHide={(requestNumber) => void hideShippedBatch(requestNumber)}
             />
           ) : null}
 
@@ -305,15 +323,18 @@ function ClassifySection({
   onClassify,
 }: {
   lines: SampleLine[];
-  onClassify: (lineId: number, stage: typeof FORMULA_STAGE_MAKE | typeof FORMULA_STAGE_FILL) => void;
+  onClassify: (
+    lineId: number,
+    stage: typeof FORMULA_STAGE_MAKE | typeof FORMULA_STAGE_FILL | typeof FORMULA_STAGE_DONE,
+  ) => void;
 }) {
   const styles = STAGE_SECTION_STYLES.classify;
   const groups = groupLines(lines);
 
   return (
     <section className={`review-section border-l-4 ${styles.border}`}>
-      <SectionHeader id={SECTION_IDS.classify} title="Make or fill" count={lines.length} styles={styles} />
-      <div className="data-table" role="region" aria-label="Make or fill table" tabIndex={0}>
+      <SectionHeader id={SECTION_IDS.classify} title="Classify" count={lines.length} styles={styles} />
+      <div className="data-table" role="region" aria-label="Classify table" tabIndex={0}>
         <table>
           <thead>
             <tr>
@@ -362,6 +383,14 @@ function ClassifySection({
                         onClick={() => onClassify(line.id, FORMULA_STAGE_FILL)}
                       >
                         Fill
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-stage btn-stage-done"
+                        aria-label={`Classify ${line.formula_name} as done`}
+                        onClick={() => onClassify(line.id, FORMULA_STAGE_DONE)}
+                      >
+                        Done
                       </button>
                     </div>
                   </td>
@@ -513,13 +542,25 @@ function ShippedSection({
   batches,
   open,
   onToggle,
+  onHide,
 }: {
   batches: ShippedBatchSummary[];
   open: boolean;
   onToggle: () => void;
+  onHide: (requestNumber: string) => void;
 }) {
   const router = useRouter();
   const styles = STAGE_SECTION_STYLES.shipped;
+  const [hiding, setHiding] = useState<string | null>(null);
+
+  async function handleHide(requestNumber: string) {
+    setHiding(requestNumber);
+    try {
+      await onHide(requestNumber);
+    } finally {
+      setHiding(null);
+    }
+  }
 
   return (
     <section className={`review-section border-l-4 ${styles.border}`}>
@@ -536,6 +577,9 @@ function ShippedSection({
         </span>
         <span className="type-caption ml-auto text-ink-faint">{open ? "Hide" : "Show"}</span>
       </button>
+      <p className="type-caption mb-3 text-ink-faint">
+        Shipped requests older than 2 months are hidden automatically.
+      </p>
 
       {open ? (
         <div className="data-table data-table-wide" role="region" aria-label="Shipped requests table" tabIndex={0}>
@@ -547,6 +591,7 @@ function ShippedSection({
                 <th className="min-w-[8rem]">Ship to</th>
                 <th className="min-w-[8rem]">Tracking</th>
                 <th className="w-20">Formulas</th>
+                <th className="w-32">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -595,6 +640,19 @@ function ShippedSection({
                     )}
                   </td>
                   <td className="whitespace-nowrap">{batch.formula_count}</td>
+                  <td className="whitespace-nowrap">
+                    <button
+                      type="button"
+                      className="type-muted font-medium hover:text-ink"
+                      disabled={hiding === batch.request_number}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleHide(batch.request_number);
+                      }}
+                    >
+                      {hiding === batch.request_number ? "Removing..." : "Remove from view"}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -29,6 +29,7 @@ export type RequestBatch = {
   request_number: string;
   status: RequestStatus;
   shipped_at: string | null;
+  hidden_from_view_at: string | null;
   updated_at: string;
   carrier: string | null;
   tracking_number: string | null;
@@ -100,6 +101,7 @@ export type RequestSummary = {
   done_count: number;
   status: RequestStatus;
   shipped_at: string | null;
+  hidden_from_view_at: string | null;
 };
 
 export type PendingSample = {

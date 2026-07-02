@@ -124,6 +124,10 @@ export async function ensureSchema(): Promise<void> {
     ALTER TABLE request_batches
     ADD COLUMN IF NOT EXISTS expected_delivery_date DATE
   `;
+  await sql`
+    ALTER TABLE request_batches
+    ADD COLUMN IF NOT EXISTS hidden_from_view_at TIMESTAMP
+  `;
   await backfillMissingBatches();
 }
 
@@ -250,7 +254,10 @@ export async function listShippedBatchSummaries(search?: string): Promise<Shippe
       rb.expected_delivery_date::text AS expected_delivery_date
     FROM batch_lines
     INNER JOIN request_batches rb ON rb.request_number = batch_lines.request_number
-    WHERE (${searchTerm}::text IS NULL OR (
+    WHERE rb.hidden_from_view_at IS NULL
+      AND rb.shipped_at IS NOT NULL
+      AND rb.shipped_at >= NOW() - INTERVAL '2 months'
+      AND (${searchTerm}::text IS NULL OR (
       batch_lines.request_number ILIKE '%' || ${searchTerm} || '%'
       OR batch_lines.email ILIKE '%' || ${searchTerm} || '%'
       OR batch_lines.destination ILIKE '%' || ${searchTerm} || '%'
@@ -458,7 +465,8 @@ export async function listRequestSummaries(
       grouped.fill_count,
       grouped.done_count,
       COALESCE(request_batches.status, ${REQUEST_STATUS_NEW}) AS status,
-      request_batches.shipped_at::text AS shipped_at
+      request_batches.shipped_at::text AS shipped_at,
+      request_batches.hidden_from_view_at::text AS hidden_from_view_at
     FROM grouped
     LEFT JOIN request_batches
       ON request_batches.request_number = grouped.request_number
@@ -495,6 +503,7 @@ export async function getRequestBatch(requestNumber: string): Promise<RequestBat
       request_number,
       status,
       shipped_at::text,
+      hidden_from_view_at::text,
       updated_at::text,
       carrier,
       tracking_number,
@@ -551,11 +560,13 @@ export async function updateRequestStatus(
         carrier = ${carrier},
         tracking_number = ${trackingNumber},
         expected_delivery_date = ${expectedDelivery},
+        hidden_from_view_at = NULL,
         updated_at = NOW()
       RETURNING
         request_number,
         status,
         shipped_at::text,
+        hidden_from_view_at::text,
         updated_at::text,
         carrier,
         tracking_number,
@@ -574,11 +585,43 @@ export async function updateRequestStatus(
       carrier = NULL,
       tracking_number = NULL,
       expected_delivery_date = NULL,
+      hidden_from_view_at = NULL,
       updated_at = NOW()
     RETURNING
       request_number,
       status,
       shipped_at::text,
+      hidden_from_view_at::text,
+      updated_at::text,
+      carrier,
+      tracking_number,
+      expected_delivery_date::text
+  `) as RequestBatch[];
+
+  return rows[0];
+}
+
+export async function hideShippedBatchFromView(requestNumber: string): Promise<RequestBatch> {
+  const sql = getSql();
+  const batch = await getRequestBatch(requestNumber);
+  if (!batch) {
+    throw new Error("REQUEST_NOT_FOUND");
+  }
+  if (batch.status !== REQUEST_STATUS_SHIPPED) {
+    throw new Error("NOT_SHIPPED");
+  }
+
+  const rows = (await sql`
+    UPDATE request_batches
+    SET
+      hidden_from_view_at = NOW(),
+      updated_at = NOW()
+    WHERE request_number = ${requestNumber}
+    RETURNING
+      request_number,
+      status,
+      shipped_at::text,
+      hidden_from_view_at::text,
       updated_at::text,
       carrier,
       tracking_number,

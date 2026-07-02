@@ -24,7 +24,9 @@ export function normalizeFormulaStage(value: string | null | undefined): Formula
 
 export function isValidStageTransition(from: FormulaStage, to: FormulaStage): boolean {
   if (from === FORMULA_STAGE_CLASSIFY) {
-    return to === FORMULA_STAGE_MAKE || to === FORMULA_STAGE_FILL;
+    return (
+      to === FORMULA_STAGE_MAKE || to === FORMULA_STAGE_FILL || to === FORMULA_STAGE_DONE
+    );
   }
   if (from === FORMULA_STAGE_MAKE || from === FORMULA_STAGE_FILL) {
     return to === FORMULA_STAGE_DONE;
@@ -47,7 +49,7 @@ export function stageActionLabel(stage: FormulaStage): string | null {
 }
 
 export function formatFormulaStage(stage: FormulaStage): string {
-  if (stage === FORMULA_STAGE_CLASSIFY) return "Make or fill";
+  if (stage === FORMULA_STAGE_CLASSIFY) return "Classify";
   if (stage === FORMULA_STAGE_MAKE) return "Make";
   if (stage === FORMULA_STAGE_FILL) return "Fill";
   return "Done";

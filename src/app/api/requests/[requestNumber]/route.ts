@@ -3,6 +3,7 @@ import {
   ensureSchema,
   getRequestBatch,
   getRequestLines,
+  hideShippedBatchFromView,
   shipRequestWithNotification,
   updateRequestStatus,
 } from "@/lib/requests";
@@ -74,6 +75,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const body = (await request.json()) as Record<string, unknown>;
+
+    if (body.hide_from_view === true) {
+      const batch = await hideShippedBatchFromView(requestNumber);
+      return NextResponse.json({
+        request_number: requestNumber,
+        status: normalizeRequestStatus(batch.status),
+        shipped_at: batch.shipped_at,
+        hidden_from_view_at: batch.hidden_from_view_at,
+      });
+    }
+
     const status = parseStatus(body.status);
     if (!status) {
       return NextResponse.json({ error: "Invalid status." }, { status: 400 });
@@ -124,6 +136,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json(
         { error: "Tracking number is required to ship." },
         { status: 400 },
+      );
+    }
+    if (error instanceof Error && error.message === "NOT_SHIPPED") {
+      return NextResponse.json(
+        { error: "Only shipped requests can be removed from view." },
+        { status: 409 },
       );
     }
     console.error(error);

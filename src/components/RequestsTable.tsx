@@ -8,6 +8,7 @@ import {
   requestStatusBadgeClassForSummary,
 } from "@/lib/requestStatus";
 import { REQUEST_STATUS_SHIPPED, type RequestSummary } from "@/lib/types";
+import { isVisibleInShippedView } from "@/lib/shippedVisibility";
 import { TableSkeleton } from "@/components/TableSkeleton";
 
 type ListFilter = "all" | "active" | "ready" | "shipped";
@@ -28,7 +29,12 @@ function displayField(value: string): string {
 function matchesFilter(request: RequestSummary, filter: ListFilter): boolean {
   const isReady =
     request.sample_count > 0 && request.done_count === request.sample_count;
-  if (filter === "shipped") return request.status === REQUEST_STATUS_SHIPPED;
+  if (filter === "shipped") {
+    return (
+      request.status === REQUEST_STATUS_SHIPPED &&
+      isVisibleInShippedView(request.shipped_at, request.hidden_from_view_at)
+    );
+  }
   if (filter === "ready") return isReady && request.status !== REQUEST_STATUS_SHIPPED;
   if (filter === "active") return request.status !== REQUEST_STATUS_SHIPPED && !isReady;
   return true;
