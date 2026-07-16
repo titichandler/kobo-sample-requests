@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sendNewRequestNotification } from "@/lib/email";
 import {
   createRequest,
   ensureSchema,
@@ -48,7 +49,30 @@ export async function POST(request: Request) {
     }
 
     const result = await createRequest(payload);
-    return NextResponse.json(result, { status: 201 });
+    const header = result.lines[0];
+
+    const notify = await sendNewRequestNotification({
+      requestNumber: result.request_number,
+      contactName: header.contact_name,
+      email: header.email,
+      requestOrigin: header.request_origin,
+      destination: header.destination,
+      dueDate: header.due_date,
+      lines: result.lines,
+    });
+
+    if (!notify.ok) {
+      console.warn("New request team email not sent:", notify.message);
+    }
+
+    return NextResponse.json(
+      {
+        ...result,
+        team_email_sent: notify.ok,
+        team_email_warning: notify.ok ? null : notify.message,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     console.error(error);
     return NextResponse.json(

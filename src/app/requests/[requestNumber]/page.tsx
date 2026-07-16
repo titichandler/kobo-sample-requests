@@ -85,6 +85,10 @@ export default async function RequestDetailPage({ params }: PageProps) {
         <Card title="Request summary">
           <dl className="type-body-sm grid gap-4">
             <div>
+              <dt className="dl-label">Name</dt>
+              <dd className="mt-1 text-ink">{header.contact_name || "—"}</dd>
+            </div>
+            <div>
               <dt className="dl-label">Email</dt>
               <dd className="mt-1 text-ink">{header.email}</dd>
             </div>

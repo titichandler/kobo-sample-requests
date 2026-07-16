@@ -15,6 +15,7 @@ export function RequestForm() {
   const router = useRouter();
   const { showToast } = useToast();
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [contactName, setContactName] = useState("");
   const [email, setEmail] = useState("");
   const [requestOrigin, setRequestOrigin] = useState("");
   const [destination, setDestination] = useState("");
@@ -48,6 +49,7 @@ export function RequestForm() {
 
   function validateDetails(): string[] {
     const lineErrors: string[] = [];
+    if (!contactName.trim()) lineErrors.push("Name is required.");
     if (!email.trim()) lineErrors.push("Email address is required.");
     if (!requestOrigin.trim()) lineErrors.push("Requested from is required.");
     if (!destination.trim()) lineErrors.push("Ship to is required.");
@@ -163,6 +165,7 @@ export function RequestForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          contact_name: contactName,
           email,
           request_origin: requestOrigin,
           destination,
@@ -215,6 +218,16 @@ export function RequestForm() {
       {step === 1 ? (
         <Card title="Request details">
           <div className="grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="field-label">Name *</span>
+              <input
+                className="field-input"
+                type="text"
+                placeholder="First and last name"
+                value={contactName}
+                onChange={(event) => setContactName(event.target.value)}
+              />
+            </label>
             <label className="block">
               <span className="field-label">Email address *</span>
               <input
@@ -402,6 +415,10 @@ export function RequestForm() {
       {step === 3 ? (
         <Card title="Review your request">
           <dl className="type-body-sm grid gap-4 md:grid-cols-2">
+            <div>
+              <dt className="dl-label">Name</dt>
+              <dd className="mt-1 text-ink">{contactName}</dd>
+            </div>
             <div>
               <dt className="dl-label">Email</dt>
               <dd className="mt-1 text-ink">{email}</dd>

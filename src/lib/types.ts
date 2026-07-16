@@ -40,6 +40,7 @@ export type ShippingDetails = {
   carrier: string;
   tracking_number: string;
   expected_delivery_date?: string | null;
+  send_email?: boolean;
 };
 
 export type SampleLine = {
@@ -52,6 +53,7 @@ export type SampleLine = {
   destination: string;
   request_origin: string;
   email: string;
+  contact_name: string;
   created_at: string;
   stage: FormulaStage;
 };
@@ -112,6 +114,7 @@ export type PendingSample = {
 };
 
 export type CreateRequestPayload = {
+  contact_name: string;
   email: string;
   request_origin: string;
   destination: string;

@@ -87,6 +87,10 @@ export async function ensureSchema(): Promise<void> {
   `;
   await sql`
     ALTER TABLE sample_requests
+    ADD COLUMN IF NOT EXISTS contact_name VARCHAR(255) NOT NULL DEFAULT ''
+  `;
+  await sql`
+    ALTER TABLE sample_requests
     ADD COLUMN IF NOT EXISTS stage VARCHAR(20) NOT NULL DEFAULT 'classify'
   `;
   await sql`
@@ -170,6 +174,7 @@ export async function listActiveLinesByStage(
       sr.destination,
       sr.request_origin,
       sr.email,
+      sr.contact_name,
       sr.created_at::text,
       sr.stage
     FROM sample_requests sr
@@ -179,6 +184,7 @@ export async function listActiveLinesByStage(
       AND (${searchTerm}::text IS NULL OR (
         sr.request_number ILIKE '%' || ${searchTerm} || '%'
         OR sr.email ILIKE '%' || ${searchTerm} || '%'
+        OR sr.contact_name ILIKE '%' || ${searchTerm} || '%'
         OR sr.request_origin ILIKE '%' || ${searchTerm} || '%'
         OR sr.destination ILIKE '%' || ${searchTerm} || '%'
         OR sr.formula_code ILIKE '%' || ${searchTerm} || '%'
@@ -292,6 +298,7 @@ export async function getSampleLine(lineId: number): Promise<SampleLine | null> 
       destination,
       request_origin,
       email,
+      contact_name,
       created_at::text,
       stage
     FROM sample_requests
@@ -334,6 +341,7 @@ export async function updateLineStage(
       destination,
       request_origin,
       email,
+      contact_name,
       created_at::text,
       stage
   `) as SampleLine[];
@@ -488,6 +496,7 @@ export async function getRequestLines(requestNumber: string): Promise<SampleLine
       destination,
       request_origin,
       email,
+      contact_name,
       created_at::text,
       stage
     FROM sample_requests
@@ -636,7 +645,7 @@ export async function shipRequestWithNotification(
   shipping: ShippingDetails,
 ): Promise<{
   batch: RequestBatch;
-  email: SendShipmentEmailResult;
+  email: SendShipmentEmailResult | null;
 }> {
   const lines = await getRequestLines(requestNumber);
   if (!lines.length) {
@@ -646,9 +655,14 @@ export async function shipRequestWithNotification(
   const batch = await updateRequestStatus(requestNumber, REQUEST_STATUS_SHIPPED, shipping);
   const header = lines[0];
 
+  if (shipping.send_email === false) {
+    return { batch, email: null };
+  }
+
   const email = await sendShipmentNotification({
     requestNumber,
     recipientEmail: header.email,
+    contactName: header.contact_name,
     destination: header.destination,
     carrier: batch.carrier ?? shipping.carrier,
     trackingNumber: batch.tracking_number ?? shipping.tracking_number,
@@ -680,6 +694,7 @@ export async function createRequest(payload: CreateRequestPayload): Promise<{
         destination,
         request_origin,
         email,
+        contact_name,
         stage
       ) VALUES (
         ${requestNumber},
@@ -690,6 +705,7 @@ export async function createRequest(payload: CreateRequestPayload): Promise<{
         ${payload.destination.trim()},
         ${payload.request_origin.trim()},
         ${payload.email.trim()},
+        ${payload.contact_name.trim()},
         ${FORMULA_STAGE_CLASSIFY}
       )
       RETURNING
@@ -702,6 +718,7 @@ export async function createRequest(payload: CreateRequestPayload): Promise<{
         destination,
         request_origin,
         email,
+        contact_name,
         created_at::text,
         stage
     `) as SampleLine[];

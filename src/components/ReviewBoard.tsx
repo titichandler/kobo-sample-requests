@@ -172,11 +172,13 @@ export function ReviewBoard() {
           carrier: values.carrier,
           tracking_number: values.tracking_number,
           expected_delivery_date: values.expected_delivery_date || null,
+          send_email: values.send_email,
         }),
       });
       const data = (await response.json().catch(() => null)) as {
         error?: string;
         email_sent?: boolean;
+        email_skipped?: boolean;
         email_warning?: string | null;
       } | null;
 
@@ -186,7 +188,9 @@ export function ReviewBoard() {
       }
 
       setShipTarget(null);
-      if (data?.email_sent) {
+      if (data?.email_skipped) {
+        showToast(`${requestNumber} shipped (email skipped).`);
+      } else if (data?.email_sent) {
         showToast(`${requestNumber} shipped. Confirmation email sent.`);
       } else if (data?.email_warning) {
         showToast(

@@ -11,6 +11,10 @@ export function validateCreateRequest(payload: CreateRequestPayload): string[] {
     errors.push("Enter a valid email address.");
   }
 
+  if (!payload.contact_name?.trim()) {
+    errors.push("Name is required.");
+  }
+
   if (!payload.request_origin?.trim()) {
     errors.push("Request origin is required.");
   }

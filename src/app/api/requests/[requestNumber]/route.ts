@@ -34,8 +34,9 @@ function parseShippingDetails(body: Record<string, unknown>): ShippingDetails | 
     typeof body.expected_delivery_date === "string" && body.expected_delivery_date.trim()
       ? body.expected_delivery_date.trim()
       : null;
+  const send_email = body.send_email !== false;
 
-  return { carrier, tracking_number, expected_delivery_date };
+  return { carrier, tracking_number, expected_delivery_date, send_email };
 }
 
 export async function GET(_request: Request, context: RouteContext) {
@@ -109,8 +110,9 @@ export async function PATCH(request: Request, context: RouteContext) {
         carrier: batch.carrier,
         tracking_number: batch.tracking_number,
         expected_delivery_date: batch.expected_delivery_date,
-        email_sent: email.ok,
-        email_warning: email.ok ? null : email.message,
+        email_sent: email?.ok === true,
+        email_skipped: shipping.send_email === false,
+        email_warning: email && !email.ok ? email.message : null,
       });
     }
 
