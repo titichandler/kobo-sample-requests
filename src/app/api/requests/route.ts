@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { sendNewRequestNotification } from "@/lib/email";
+import {
+  sendNewRequestNotification,
+  sendRequestReceivedConfirmation,
+} from "@/lib/email";
 import {
   createRequest,
   ensureSchema,
@@ -50,8 +53,7 @@ export async function POST(request: Request) {
 
     const result = await createRequest(payload);
     const header = result.lines[0];
-
-    const notify = await sendNewRequestNotification({
+    const emailPayload = {
       requestNumber: result.request_number,
       contactName: header.contact_name,
       email: header.email,
@@ -59,17 +61,27 @@ export async function POST(request: Request) {
       destination: header.destination,
       dueDate: header.due_date,
       lines: result.lines,
-    });
+    };
 
-    if (!notify.ok) {
-      console.warn("New request team email not sent:", notify.message);
+    const [teamNotify, requesterConfirm] = await Promise.all([
+      sendNewRequestNotification(emailPayload),
+      sendRequestReceivedConfirmation(emailPayload),
+    ]);
+
+    if (!teamNotify.ok) {
+      console.warn("New request team email not sent:", teamNotify.message);
+    }
+    if (!requesterConfirm.ok) {
+      console.warn("Requester confirmation email not sent:", requesterConfirm.message);
     }
 
     return NextResponse.json(
       {
         ...result,
-        team_email_sent: notify.ok,
-        team_email_warning: notify.ok ? null : notify.message,
+        team_email_sent: teamNotify.ok,
+        team_email_warning: teamNotify.ok ? null : teamNotify.message,
+        requester_email_sent: requesterConfirm.ok,
+        requester_email_warning: requesterConfirm.ok ? null : requesterConfirm.message,
       },
       { status: 201 },
     );
