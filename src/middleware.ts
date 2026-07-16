@@ -15,6 +15,20 @@ function isProtectedApiPath(pathname: string, method: string): boolean {
   if (pathname.startsWith("/api/requests/") && (method === "GET" || method === "PATCH")) {
     return true;
   }
+  // Formula library admin — keep public GET /api/formulas for the request form
+  if (pathname === "/api/formulas" && method === "POST") {
+    return true;
+  }
+  if (pathname === "/api/formulas/admin" && method === "GET") {
+    return true;
+  }
+  if (
+    pathname.startsWith("/api/formulas/") &&
+    pathname !== "/api/formulas/admin" &&
+    (method === "PATCH" || method === "DELETE")
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -50,5 +64,7 @@ export const config = {
     "/api/requests/:path*",
     "/api/review-board",
     "/api/lines/:path*",
+    "/api/formulas",
+    "/api/formulas/:path*",
   ],
 };

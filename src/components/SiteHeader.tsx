@@ -33,6 +33,7 @@ export async function SiteHeader() {
                 Review board
               </NavLink>
               <NavLink href="/requests/all">All requests</NavLink>
+              <NavLink href="/requests/formulas">Formulas</NavLink>
               <SignOutButton />
             </>
           ) : (

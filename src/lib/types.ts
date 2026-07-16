@@ -131,3 +131,13 @@ export type FormulaOption = {
   formula_name: string;
   formula_type: string;
 };
+
+export type FormulaRecord = FormulaOption & {
+  id: number;
+};
+
+export type FormulaInput = {
+  formula_code: string;
+  formula_name: string;
+  formula_type?: string;
+};

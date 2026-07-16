@@ -11,7 +11,6 @@ import {
 } from "./types";
 import type {
   CreateRequestPayload,
-  FormulaOption,
   FormulaStage,
   ReadyToShipBatch,
   RequestBatch,
@@ -145,16 +144,6 @@ async function backfillMissingBatches(): Promise<void> {
     ON CONFLICT (request_number) DO NOTHING
   `;
 }
-
-export async function listFormulas(): Promise<FormulaOption[]> {
-  const sql = getSql();
-  return (await sql`
-    SELECT formula_code, formula_name, formula_type
-    FROM formula_library
-    ORDER BY formula_code
-  `) as FormulaOption[];
-}
-
 
 export async function listActiveLinesByStage(
   stage: FormulaStage,
