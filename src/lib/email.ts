@@ -208,6 +208,49 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function buildRequestReceivedEmailHtml(payload: NewRequestEmailPayload): string {
+  const sampleList = payload.lines
+    .map((line) => `<li style="margin:4px 0;">${escapeHtml(formatSampleLine(line))}</li>`)
+    .join("");
+
+  return `
+    <div style="font-family:system-ui,sans-serif;color:#171717;max-width:560px;line-height:1.5;">
+      <p>Hi ${escapeHtml(greetingName(payload.contactName))},</p>
+      <p>Thank you — we have received your sample request.</p>
+      <p><strong>Reference number:</strong> ${escapeHtml(payload.requestNumber)}</p>
+      <p>You requested the following:</p>
+      <ul style="padding-left:20px;margin:16px 0;">${sampleList}</ul>
+      <p>
+        <strong>Ship to:</strong> ${escapeHtml(payload.destination || "—")}<br />
+        <strong>Requested from:</strong> ${escapeHtml(payload.requestOrigin || "—")}
+      </p>
+      <p style="margin-top:24px;color:#737373;font-size:13px;">
+        Please keep your reference number for your records. You will receive another email when your samples are shipped.
+      </p>
+    </div>
+  `;
+}
+
+function buildRequestReceivedEmailText(payload: NewRequestEmailPayload): string {
+  const sampleLines = payload.lines.map((line) => formatSampleLine(line)).join("\n");
+
+  return [
+    `Hi ${greetingName(payload.contactName)},`,
+    "",
+    "Thank you — we have received your sample request.",
+    "",
+    `Reference number: ${payload.requestNumber}`,
+    "",
+    "You requested the following:",
+    sampleLines,
+    "",
+    `Ship to: ${payload.destination || "—"}`,
+    `Requested from: ${payload.requestOrigin || "—"}`,
+    "",
+    "Please keep your reference number for your records. You will receive another email when your samples are shipped.",
+  ].join("\n");
+}
+
 export async function sendShipmentNotification(
   payload: ShipmentEmailPayload,
 ): Promise<SendEmailResult> {
@@ -223,6 +266,33 @@ export async function sendShipmentNotification(
       subject: `Your samples are on the way — ${payload.requestNumber}`,
       html: buildShipmentEmailHtml(payload),
       text: buildShipmentEmailText(payload),
+    });
+
+    if (error) {
+      return { ok: false, reason: "send_failed", message: error.message };
+    }
+    return { ok: true, id: data?.id ?? "sent" };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not send email.";
+    return { ok: false, reason: "send_failed", message };
+  }
+}
+
+export async function sendRequestReceivedConfirmation(
+  payload: NewRequestEmailPayload,
+): Promise<SendEmailResult> {
+  const client = getResendClient();
+  if ("error" in client) {
+    return { ok: false, reason: "not_configured", message: client.error };
+  }
+
+  try {
+    const { data, error } = await client.resend.emails.send({
+      from: client.from,
+      to: payload.email,
+      subject: `Sample request received — ${payload.requestNumber}`,
+      html: buildRequestReceivedEmailHtml(payload),
+      text: buildRequestReceivedEmailText(payload),
     });
 
     if (error) {
