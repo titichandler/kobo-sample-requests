@@ -34,9 +34,18 @@ const DEFAULT_TEAM_NOTIFY_EMAILS = [
   "TChandler@koboproductsinc.com",
 ];
 
+function normalizeFromAddress(value: string | undefined): string {
+  let from = (value ?? "").trim();
+  // Strip wrapping quotes often pasted into Vercel / .env files
+  from = from.replace(/^["'`]+|["'`]+$/g, "").trim();
+  // Normalize odd spacing around angle brackets
+  from = from.replace(/\s*<\s*/g, " <").replace(/\s*>\s*/g, ">").trim();
+  return from;
+}
+
 function getResendClient(): { resend: Resend; from: string } | { error: string } {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.RESEND_FROM?.trim();
+  const from = normalizeFromAddress(process.env.RESEND_FROM);
   if (!apiKey || !from) {
     const missing = [
       !apiKey ? "RESEND_API_KEY" : null,
@@ -46,6 +55,17 @@ function getResendClient(): { resend: Resend; from: string } | { error: string }
       error: `${missing.join(" and ")} is not set. Add them in .env.local / Vercel and restart.`,
     };
   }
+
+  const looksValid =
+    /^[^\s<>]+@[^\s<>]+\.[^\s<>]+$/.test(from) ||
+    /^.+\s<[^\s<>]+@[^\s<>]+\.[^\s<>]+>$/.test(from);
+  if (!looksValid) {
+    return {
+      error:
+        'RESEND_FROM must look like samples@requestsample.co.uk or Kobo Samples <samples@requestsample.co.uk> (no surrounding quotes).',
+    };
+  }
+
   return { resend: new Resend(apiKey), from };
 }
 
